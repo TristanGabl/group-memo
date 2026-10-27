@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Group Memo</title>
+  <meta name="description" content="Records a conversation and writes down who said what, entirely in your browser.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="masthead">
+      <h1>Group Memo</h1>
+      <p class="lede">Records a conversation and writes down who said what. Speech recognition and speaker detection run in this browser, so your audio never leaves the device.</p>
+    </header>
+
+    <section class="capture" aria-labelledby="capture-title">
+      <h2 id="capture-title" class="visually-hidden">Record or upload</h2>
+
+      <div class="recorder">
+        <button id="record" class="record" type="button" aria-pressed="false">
+          <span class="record-dot" aria-hidden="true"></span>
+          <span id="record-label">Start recording</span>
+        </button>
+        <div class="readout">
+          <span id="timer" class="timer">00:00</span>
+          <canvas id="level" class="level" width="240" height="32" aria-hidden="true"></canvas>
+        </div>
+      </div>
+
+      <div class="or"><span>or</span></div>
+
+      <label class="upload" for="file">
+        <input id="file" type="file" accept="audio/*,video/*">
+        <span>Choose a recording</span>
+        <small>m4a, mp3, wav, webm, mp4 …</small>
+      </label>
+
+      <details class="settings">
+        <summary>Settings</summary>
+        <div class="fields">
+          <label for="language">Language
+            <select id="language">
+              <option value="">Detect automatically</option>
+              <option value="en">English</option>
+              <option value="de">German</option>
+              <option value="fr">French</option>
+              <option value="it">Italian</option>
+              <option value="es">Spanish</option>
+            </select>
+          </label>
+          <label for="quality">Accuracy
+            <select id="quality">
+              <option value="fast">Fast · 240 MB download</option>
+              <option value="accurate">Accurate · 620 MB download, laptops</option>
+            </select>
+          </label>
+          <label for="speakers">People in the conversation
+            <select id="speakers">
+              <option value="0">Detect automatically</option>
+              <option value="2">2</option><option value="3">3</option><option value="4">4</option>
+              <option value="5">5</option><option value="6">6</option><option value="7">7</option>
+              <option value="8">8</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">If two people get merged or one person is split, set the number of people and process again.</p>
+      </details>
+    </section>
+
+    <section id="progress" class="progress" hidden aria-live="polite">
+      <div class="progress-head">
+        <strong id="stage">Preparing audio</strong>
+        <span id="device" class="device"></span>
+      </div>
+      <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
+      <p id="stage-detail" class="hint"></p>
+    </section>
+
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <section id="empty" class="empty">
+      <h2>How it works</h2>
+      <ol>
+        <li>Put the phone or laptop in the middle of the table and press <b>Start recording</b>. Keep this page open; the screen stays on while recording.</li>
+        <li>Press <b>Stop</b>. The app finds where each voice speaks, then transcribes the speech.</li>
+        <li>Rename “Speaker 1”, “Speaker 2” … to real names, then copy or download the transcript.</li>
+      </ol>
+      <p class="hint">The first run downloads the speech models (about 240 MB with Fast) and keeps them in the browser for next time. Only the models come from the internet; your recording stays here.</p>
+    </section>
+
+    <section id="result" class="result" hidden>
+      <div class="result-head">
+        <h2>Transcript</h2>
+        <span id="summary-line" class="meta"></span>
+      </div>
+      <audio id="player" controls preload="metadata"></audio>
+      <div id="people" class="people"></div>
+      <div class="actions">
+        <button id="copy" type="button">Copy text</button>
+        <button id="download" type="button">Download .txt</button>
+        <button id="summarize" type="button" hidden>Summarize on this device</button>
+        <button id="reprocess" type="button" hidden>Process again</button>
+      </div>
+      <div id="summary" class="summary" hidden></div>
+      <ol id="lines" class="lines"></ol>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
