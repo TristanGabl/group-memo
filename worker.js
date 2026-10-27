@@ -1,13 +1,16 @@
 // Runs the speech engine off the main thread. Models download once from
 // Hugging Face and are cached by the browser; audio never leaves this worker.
 import * as T from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
-import { createEngine } from './engine.js';
+
+// The page passes ?v=<version>; reuse it so a cached old engine.js is never mixed in.
+const { createEngine } = await import(`./engine.js${self.location.search}`);
 
 T.env.allowLocalModels = false;
 
 const report = p => postMessage({ type: 'progress', ...p });
 let engine = null;
 let device = null;
+let lowMemory = null;
 
 async function hasWebGPU() {
   try { return !!(await navigator.gpu?.requestAdapter()); } catch { return false; }
@@ -16,7 +19,8 @@ async function hasWebGPU() {
 self.onmessage = async ({ data }) => {
   if (data.type !== 'run') return;
   try {
-    if (!engine) {
+    if (!engine || lowMemory !== data.lowMemory) {
+      lowMemory = data.lowMemory;
       // Phones get the compact CPU models: WebGPU's larger model files and GPU buffers
       // can push a mobile tab past its memory limit.
       device = !data.lowMemory && (await hasWebGPU()) ? 'webgpu' : 'wasm';

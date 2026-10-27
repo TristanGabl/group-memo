@@ -6,29 +6,48 @@ const $ = id => document.getElementById(id);
 
 const ui = {
   record: $('record'), recordLabel: $('record-label'), timer: $('timer'), level: $('level'),
-  file: $('file'), language: $('language'), quality: $('quality'), speakers: $('speakers'),
+  file: $('file'), language: $('language'), quality: $('quality'), speakers: $('speakers'), mode: $('mode'),
   progress: $('progress'), stage: $('stage'), device: $('device'), barFill: $('bar-fill'), stageDetail: $('stage-detail'),
   error: $('error'), empty: $('empty'), result: $('result'), summaryLine: $('summary-line'), player: $('player'),
   people: $('people'), lines: $('lines'), copy: $('copy'), download: $('download'),
   summarize: $('summarize'), reprocess: $('reprocess'), summary: $('summary'),
 };
 
+const VERSION = '0.3';
 const state = { result: null, names: [], audio: null, audioUrl: null, busy: false };
-const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL(`./worker.js?v=${VERSION}`, import.meta.url), { type: 'module' });
+
+const MODE_KEY = 'group-memo:mode';
+$('version').textContent = `Group Memo ${VERSION}`;
 
 // Phones and tablets have far less memory per tab than laptops.
-const LOW_MEMORY = navigator.userAgentData?.mobile
-  || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+const LOOKS_LIKE_PHONE = !!(navigator.userAgentData?.mobile
+  || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  || (navigator.deviceMemory ?? 8) <= 4;
-if (LOW_MEMORY) {
+  || (navigator.deviceMemory ?? 8) <= 4);
+let LOW_MEMORY = LOOKS_LIKE_PHONE;
+
+function applyMode() {
+  LOW_MEMORY = ui.mode.value === 'auto' ? LOOKS_LIKE_PHONE : ui.mode.value === 'light';
+  const fast = ui.quality.querySelector('option[value="fast"]');
   const accurate = ui.quality.querySelector('option[value="accurate"]');
-  accurate.disabled = true;
-  accurate.textContent = 'Accurate · laptops and desktops only';
-  ui.quality.querySelector('option[value="fast"]').textContent = 'Fast · 115 MB download';
-  ui.quality.value = 'fast';
-  document.querySelector('.fast-size').textContent = 'about 115 MB';
+  fast.textContent = LOW_MEMORY ? 'Fast · 106 MB download' : 'Fast · 240 MB download';
+  accurate.disabled = LOW_MEMORY;
+  accurate.textContent = LOW_MEMORY ? 'Accurate · not available in phone mode' : 'Accurate · 620 MB download, laptops';
+  if (LOW_MEMORY) ui.quality.value = 'fast';
+  document.querySelector('.fast-size').textContent = LOW_MEMORY ? 'about 106 MB' : 'about 240 MB';
+  $('mode-hint').textContent = ui.mode.value === 'auto'
+    ? (LOOKS_LIKE_PHONE
+      ? 'This device was detected as a phone or tablet, so phone mode is used.'
+      : 'This device was detected as a laptop or desktop, so the full mode is used. If the page crashes, choose Phone mode.')
+    : '';
 }
+ui.mode.addEventListener('change', () => {
+  try { localStorage.setItem(MODE_KEY, ui.mode.value); } catch { /* optional */ }
+  applyMode();
+});
+try { ui.mode.value = localStorage.getItem(MODE_KEY) || 'auto'; } catch { /* optional */ }
+applyMode();
 
 // ---------- Recording ----------
 

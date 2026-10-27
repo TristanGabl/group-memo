@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Group Memo</title>
   <meta name="description" content="Records a conversation and writes down who said what, entirely in your browser.">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=0.3">
 </head>
 <body>
   <main class="wrap">
@@ -55,6 +55,13 @@
               <option value="accurate">Accurate · 620 MB download, laptops</option>
             </select>
           </label>
+          <label for="mode">Device mode
+            <select id="mode">
+              <option value="auto">Automatic</option>
+              <option value="light">Phone mode · smaller models, less memory</option>
+              <option value="full">Full · uses the GPU, needs more memory</option>
+            </select>
+          </label>
           <label for="speakers">People in the conversation
             <select id="speakers">
               <option value="0">Detect automatically</option>
@@ -64,6 +71,7 @@
             </select>
           </label>
         </div>
+        <p id="mode-hint" class="hint"></p>
         <p class="hint">If two people get merged or one person is split, set the number of people and process again.</p>
       </details>
     </section>
@@ -105,8 +113,10 @@
       <div id="summary" class="summary" hidden></div>
       <ol id="lines" class="lines"></ol>
     </section>
+
+    <footer id="version" class="hint"></footer>
   </main>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=0.3"></script>
 </body>
 </html>
