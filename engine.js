@@ -18,7 +18,8 @@ const MIN_VOICEPRINT_S = 0.8;  // shorter speech gives unreliable voiceprints
 const SAME_CHAIN = 0.65;       // cosine similarity for joining neighbouring pieces
 const SAME_PERSON = 0.5;       // average similarity above which two groups are one person
 
-export function createEngine(T, { asrDevice = 'wasm', smallDevice = 'wasm', onProgress = () => {} } = {}) {
+// lowMemory (phones): load one model group at a time and free the speaker models before Whisper loads.
+export function createEngine(T, { asrDevice = 'wasm', smallDevice = 'wasm', lowMemory = false, onProgress = () => {} } = {}) {
   const cache = {};
   const files = new Map();
 
@@ -52,8 +53,11 @@ export function createEngine(T, { asrDevice = 'wasm', smallDevice = 'wasm', onPr
     return cache.diarization;
   }
 
-  async function load(quality) {
-    await Promise.all([loadAsr(quality), loadDiarization()]);
+  async function unloadDiarization() {
+    if (!cache.diarization) return;
+    const [, segModel, , vpModel] = await cache.diarization;
+    delete cache.diarization;
+    await Promise.all([segModel.dispose(), vpModel.dispose()]);
   }
 
   // Transcribes only the given speech blocks, each shorter than Whisper's 30 s window,
@@ -66,7 +70,8 @@ export function createEngine(T, { asrDevice = 'wasm', smallDevice = 'wasm', onPr
       const clip = audio.subarray(Math.floor(start * SAMPLE_RATE), Math.ceil(end * SAMPLE_RATE));
       const out = await asr(clip, { return_timestamps: 'word', language: language || null, task: 'transcribe' });
       for (const c of out.chunks ?? []) {
-        if (!c.text.trim()) continue;
+        // Skip empty words and Whisper's non-speech markers such as [BLANK_AUDIO] or (music).
+        if (!c.text.trim() || /^\s*[[(].*[\])]\s*$/.test(c.text)) continue;
         words.push({ text: c.text, start: start + c.timestamp[0], end: start + (c.timestamp[1] ?? c.timestamp[0]) });
       }
     }
@@ -141,11 +146,11 @@ export function createEngine(T, { asrDevice = 'wasm', smallDevice = 'wasm', onPr
   }
 
   async function run(audio, { quality = 'fast', language = '', speakers = 0 } = {}) {
-    await load(quality);
     const duration = audio.length / SAMPLE_RATE;
     const t0 = Date.now();
     const dia = await diarize(audio, { speakers });
     const t1 = Date.now();
+    if (lowMemory) await unloadDiarization();
     const blocks = planBlocks(dia.turns, duration);
     const words = await transcribe(audio, blocks, { quality, language });
     const t2 = Date.now();
@@ -157,7 +162,7 @@ export function createEngine(T, { asrDevice = 'wasm', smallDevice = 'wasm', onPr
     };
   }
 
-  return { load, run, transcribe, diarize };
+  return { run, transcribe, diarize };
 }
 
 // Groups turns into transcription blocks: one speaker each, cut at pauses, at most MAX_BLOCK_S.

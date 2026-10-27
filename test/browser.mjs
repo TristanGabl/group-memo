@@ -1,5 +1,5 @@
 // Drives headless Chrome through the DevTools protocol: loads the app, uploads a file,
-// waits for the transcript and prints it. Usage: [QUALITY=accurate] node test/browser.mjs <audio file> [screenshot.png]
+// waits for the transcript and prints it. Usage: [QUALITY=accurate] [MOBILE=1] [URL=…] node test/browser.mjs <audio file> [screenshot.png]
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +31,9 @@ const evaluate = async expr => (await send('Runtime.evaluate', { expression: exp
 
 await send('Runtime.enable');
 await send('Page.enable');
-await send('Page.navigate', { url: 'http://127.0.0.1:8000/' });
+// MOBILE=1 pretends to be an iPhone, to exercise the low-memory path.
+if (process.env.MOBILE) await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1' });
+await send('Page.navigate', { url: process.env.URL ?? 'http://127.0.0.1:8000/' });
 await new Promise(r => setTimeout(r, 2000));
 const { root } = (await send('DOM.getDocument')).result;
 const { nodeId } = (await send('DOM.querySelector', { nodeId: root.nodeId, selector: '#file' })).result;

@@ -16,6 +16,20 @@ const ui = {
 const state = { result: null, names: [], audio: null, audioUrl: null, busy: false };
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 
+// Phones and tablets have far less memory per tab than laptops.
+const LOW_MEMORY = navigator.userAgentData?.mobile
+  || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  || (navigator.deviceMemory ?? 8) <= 4;
+if (LOW_MEMORY) {
+  const accurate = ui.quality.querySelector('option[value="accurate"]');
+  accurate.disabled = true;
+  accurate.textContent = 'Accurate · laptops and desktops only';
+  ui.quality.querySelector('option[value="fast"]').textContent = 'Fast · 115 MB download';
+  ui.quality.value = 'fast';
+  document.querySelector('.fast-size').textContent = 'about 115 MB';
+}
+
 // ---------- Recording ----------
 
 let rec = null;
@@ -146,14 +160,30 @@ function process() {
   if (state.busy || !state.audio) return;
   state.busy = true;
   setControlsDisabled(true);
+  ui.result.hidden = true;
   showProgress('Loading speech models');
   worker.postMessage({
     type: 'run',
+    lowMemory: LOW_MEMORY,
     // Copy so the original stays available for "Process again".
     audio: state.audio.slice(),
     options: { quality: ui.quality.value, language: ui.language.value, speakers: Number(ui.speakers.value) },
   });
 }
+
+function failed(message) {
+  state.busy = false;
+  setControlsDisabled(false);
+  hideProgress();
+  render();
+  showError(message);
+}
+
+// Fires when the worker itself dies, for example when the browser stops it for using too much memory.
+worker.onerror = e => {
+  e.preventDefault?.();
+  failed('The speech engine stopped unexpectedly, probably because the device ran out of memory. Reload the page, close other tabs and try a shorter recording.');
+};
 
 ui.reprocess.addEventListener('click', process);
 
@@ -167,7 +197,9 @@ const STAGES = {
 worker.onmessage = ({ data }) => {
   switch (data.type) {
     case 'device':
-      ui.device.textContent = data.device === 'webgpu' ? 'Running on the GPU (WebGPU)' : 'Running on the CPU (slower; WebGPU not available)';
+      ui.device.textContent = data.device === 'webgpu' ? 'Running on the GPU (WebGPU)'
+        : LOW_MEMORY ? 'Phone mode: smaller models on the CPU'
+        : 'Running on the CPU (slower; WebGPU not available)';
       break;
     case 'progress': {
       ui.stage.textContent = STAGES[data.stage] ?? data.stage;
@@ -181,6 +213,10 @@ worker.onmessage = ({ data }) => {
       break;
     }
     case 'result':
+      if (!data.result.utterances.length) {
+        failed('No speech was found in this recording. Check that the right microphone is selected and that people speak loudly enough, then record again.');
+        break;
+      }
       state.busy = false;
       setControlsDisabled(false);
       hideProgress();
@@ -191,10 +227,7 @@ worker.onmessage = ({ data }) => {
       render();
       break;
     case 'error':
-      state.busy = false;
-      setControlsDisabled(false);
-      hideProgress();
-      showError(`Processing failed: ${data.message}. Reload the page and try again; switching Accuracy to Fast helps on phones with little memory.`);
+      failed(`Processing failed: ${data.message}. Reload the page and try again; switching Accuracy to Fast helps on devices with little memory.`);
       break;
   }
 };

@@ -17,8 +17,10 @@ self.onmessage = async ({ data }) => {
   if (data.type !== 'run') return;
   try {
     if (!engine) {
-      device = (await hasWebGPU()) ? 'webgpu' : 'wasm';
-      engine = createEngine(T, { asrDevice: device, smallDevice: 'wasm', onProgress: report });
+      // Phones get the compact CPU models: WebGPU's larger model files and GPU buffers
+      // can push a mobile tab past its memory limit.
+      device = !data.lowMemory && (await hasWebGPU()) ? 'webgpu' : 'wasm';
+      engine = createEngine(T, { asrDevice: device, smallDevice: 'wasm', lowMemory: data.lowMemory, onProgress: report });
     }
     postMessage({ type: 'device', device });
     let result;
@@ -28,7 +30,7 @@ self.onmessage = async ({ data }) => {
       if (device !== 'webgpu') throw err;
       // Some GPUs advertise WebGPU but fail on these models; fall back to the CPU path once.
       device = 'wasm';
-      engine = createEngine(T, { asrDevice: 'wasm', smallDevice: 'wasm', onProgress: report });
+      engine = createEngine(T, { asrDevice: 'wasm', smallDevice: 'wasm', lowMemory: data.lowMemory, onProgress: report });
       postMessage({ type: 'device', device, fallback: String(err?.message ?? err) });
       result = await engine.run(data.audio, data.options);
     }
